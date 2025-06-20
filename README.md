@@ -35,6 +35,8 @@ To use this in your own repository:
 
 ## External Repository
 
-- Source: https://relay.ngit.dev/npub1hw6amg8p24ne08c9gdq8hhpqx0t0pwanpae9z25crn7m9uy7yarse465gr/ngit-repo-explorer.git
+- Source: nostr://arjen@swissdash.site/ngit-repo-explorer
 - Monitoring: Main branch
 - Check frequency: Every 10 minutes
+- Technology: Uses ngit-cli for cloning nostr repositories
+- State management: Uses GitHub Actions cache to store last known commit hash
