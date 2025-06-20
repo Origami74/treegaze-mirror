@@ -1,0 +1,135 @@
+name: Monitor External Repo and Deploy
+
+on:
+  # Run every 10 minutes
+  schedule:
+    - cron: '*/10 * * * *'
+  
+  # Allow manual triggering
+  workflow_dispatch:
+
+# Allow GitHub Pages deployment
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  check-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Get current commit hash from external repo
+      id: get-commit
+      run: |
+        # Get the latest commit hash from the external repo
+        LATEST_COMMIT=$(git ls-remote https://relay.ngit.dev/npub1hw6amg8p24ne08c9gdq8hhpqx0t0pwanpae9z25crn7m9uy7yarse465gr/ngit-repo-explorer.git HEAD | cut -f1)
+        echo "latest_commit=$LATEST_COMMIT" >> $GITHUB_OUTPUT
+        echo "Latest commit from external repo: $LATEST_COMMIT"
+    
+    - name: Get stored commit hash
+      id: get-stored
+      run: |
+        # Try to get the stored commit hash from a previous run
+        # We'll store it in a file in the repo
+        if [ -f .last-commit ]; then
+          STORED_COMMIT=$(cat .last-commit)
+          echo "stored_commit=$STORED_COMMIT" >> $GITHUB_OUTPUT
+          echo "Stored commit: $STORED_COMMIT"
+        else
+          echo "stored_commit=" >> $GITHUB_OUTPUT
+          echo "No stored commit found"
+        fi
+    
+    - name: Check if deployment needed
+      id: check-deploy
+      run: |
+        LATEST="${{ steps.get-commit.outputs.latest_commit }}"
+        STORED="${{ steps.get-stored.outputs.stored_commit }}"
+        
+        # Deploy if manual trigger or if commits are different
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$LATEST" != "$STORED" ]; then
+          echo "deploy=true" >> $GITHUB_OUTPUT
+          echo "Deployment needed - Manual trigger: ${{ github.event_name == 'workflow_dispatch' }}, Commits different: ${{ steps.get-commit.outputs.latest_commit != steps.get-stored.outputs.stored_commit }}"
+        else
+          echo "deploy=false" >> $GITHUB_OUTPUT
+          echo "No deployment needed - commits are the same"
+        fi
+    
+    - name: Setup Node.js
+      if: steps.check-deploy.outputs.deploy == 'true'
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Clone external repository
+      if: steps.check-deploy.outputs.deploy == 'true'
+      run: |
+        # Clone the external repository to get the latest code
+        git clone https://relay.ngit.dev/npub1hw6amg8p24ne08c9gdq8hhpqx0t0pwanpae9z25crn7m9uy7yarse465gr/ngit-repo-explorer.git external-repo
+    
+    - name: Copy external repo content
+      if: steps.check-deploy.outputs.deploy == 'true'
+      run: |
+        # Copy the content from external repo, excluding .git
+        rsync -av --exclude='.git' external-repo/ ./
+        # Clean up the cloned repo
+        rm -rf external-repo
+    
+    - name: Install dependencies
+      if: steps.check-deploy.outputs.deploy == 'true'
+      run: |
+        # Install dependencies for the external repo
+        if [ -f package.json ]; then
+          npm ci
+        fi
+    
+    - name: Build project
+      if: steps.check-deploy.outputs.deploy == 'true'
+      run: npm run build
+    
+    - name: Setup Pages
+      if: steps.check-deploy.outputs.deploy == 'true'
+      uses: actions/configure-pages@v4
+    
+    - name: Upload artifact
+      if: steps.check-deploy.outputs.deploy == 'true'
+      uses: actions/upload-pages-artifact@v3
+      with:
+        # Upload dist directory (adjust path if needed)
+        path: './dist'
+    
+    - name: Deploy to GitHub Pages
+      if: steps.check-deploy.outputs.deploy == 'true'
+      id: deployment
+      uses: actions/deploy-pages@v4
+    
+    - name: Store current commit hash
+      if: steps.check-deploy.outputs.deploy == 'true'
+      run: |
+        # Store the current commit hash for next comparison
+        echo "${{ steps.get-commit.outputs.latest_commit }}" > .last-commit
+    
+    - name: Commit stored hash
+      if: steps.check-deploy.outputs.deploy == 'true'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add .last-commit
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Update last commit hash: ${{ steps.get-commit.outputs.latest_commit }}"
+          git push
+        fi
