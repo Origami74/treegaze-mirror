@@ -4,7 +4,13 @@ This repository automatically mirrors and deploys the [ngit-repo-explorer](https
 
 ## How it works
 
-The GitHub Action (`.github/workflows/deploy.yml`) runs every 10 minutes and:
+The GitHub Action (`.github/workflows/deploy.yml`) runs automatically in three scenarios:
+
+1. **Every 10 minutes** (scheduled)
+2. **On commits to the main branch**
+3. **Manual trigger** via the Actions tab
+
+When triggered, it:
 
 1. Checks the latest commit from the external repository
 2. Compares it with the last known commit hash
