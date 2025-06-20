@@ -2,8 +2,8 @@ name: Monitor External Repo and Deploy
 
 on:
   # Run every 10 minutes
-  schedule:
-    - cron: '*/10 * * * *'
+  # schedule:
+  #   - cron: '*/10 * * * *'
   
   # Allow manual triggering
   workflow_dispatch:
@@ -53,7 +53,10 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: .last-commit
-        key: last-commit-hash
+        key: last-commit-hash-${{ github.repository }}
+        restore-keys: |
+          last-commit-hash-${{ github.repository }}
+          last-commit-hash
     
     - name: Get stored commit hash
       id: get-stored
