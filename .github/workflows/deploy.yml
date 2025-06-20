@@ -7,6 +7,10 @@ on:
   
   # Allow manual triggering
   workflow_dispatch:
+  
+  # Run on commits to main branch
+  push:
+    branches: [ main ]
 
 # Allow GitHub Pages deployment
 permissions:
