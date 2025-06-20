@@ -66,13 +66,6 @@ jobs:
           echo "No deployment needed - commits are the same"
         fi
     
-    - name: Setup Node.js
-      if: steps.check-deploy.outputs.deploy == 'true'
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-    
     - name: Clone external repository
       if: steps.check-deploy.outputs.deploy == 'true'
       run: |
@@ -86,6 +79,15 @@ jobs:
         rsync -av --exclude='.git' external-repo/ ./
         # Clean up the cloned repo
         rm -rf external-repo
+      
+    
+    - name: Setup Node.js
+      if: steps.check-deploy.outputs.deploy == 'true'
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
     
     - name: Install dependencies
       if: steps.check-deploy.outputs.deploy == 'true'
